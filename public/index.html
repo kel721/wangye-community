@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>王业社区 - 分享你的想法</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+
+<div class="toc" id="toc"></div>
+<div class="draft-indicator" id="draftIndicator">💾 草稿已保存</div>
+<div class="reading-progress" id="readingProgress"></div>
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<div class="batch-bar" id="batchBar">
+  <span id="batchCount">已选择 0 项</span>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-sm btn-outline" onclick="batchPin(true)">📌 置顶</button>
+    <button class="btn btn-sm btn-outline" onclick="batchPin(false)">📍 取消置顶</button>
+    <button class="btn btn-sm btn-danger" onclick="batchDelete()">🗑️ 删除</button>
+    <button class="btn btn-sm btn-ghost" onclick="cancelBatch()">取消</button>
+  </div>
+</div>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo" onclick="goHome()">
+      <span class="logo-icon">🔥</span>
+      <span>王业社区</span>
+    </div>
+    <div class="search-box">
+      <input type="text" placeholder="搜索帖子..." id="searchInput" onkeyup="handleSearch(event)">
+    </div>
+    <div class="header-actions" id="headerActions">
+      <button class="btn-icon" onclick="toggleDarkMode()" title="切换主题">🌙</button>
+      <button class="btn btn-ghost" onclick="showAuthModal()">登录</button>
+      <button class="btn btn-primary" onclick="showAuthModal('register')">注册</button>
+    </div>
+  </div>
+</header>
+
+<!-- Messages Panel -->
+<div class="messages-panel" id="messagesPanel">
+  <div class="messages-header">
+    <span>💬 私信</span>
+    <button class="modal-close" onclick="toggleMessages()">×</button>
+  </div>
+  <div class="messages-list" id="conversationsList"></div>
+  <div class="chat-view" id="chatView">
+    <div class="chat-header">
+      <button class="chat-back" onclick="showConversations()">←</button>
+      <span id="chatPartnerName"></span>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-area">
+      <input type="text" id="chatInput" placeholder="输入消息..." onkeyup="if(event.key==='Enter')sendMessage()">
+      <button class="btn btn-primary" onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- Group Chat Window -->
+<div class="chat-window" id="groupChatWindow">
+  <div class="chat-header">
+    <span id="groupChatName">群聊</span>
+    <button class="modal-close" onclick="closeGroupChat()">×</button>
+  </div>
+  <div class="chat-messages" id="groupChatMessages"></div>
+  <div class="chat-input-area">
+    <input type="text" id="groupChatInput" placeholder="输入消息..." onkeyup="if(event.key==='Enter')sendGroupMessage()">
+    <button class="btn btn-primary" onclick="sendGroupMessage()">发送</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="main-content" id="mainContent">
+    <div class="announcements-banner" id="announcementsBanner">
+      <div class="announcement-title">📢 社区公告</div>
+      <div id="announcementsList"></div>
+    </div>
+    <div class="category-tabs" id="categoryTabs">
+      <div class="category-tab active" data-category="全部" onclick="selectCategory(this)">全部</div>
+      <div class="category-tab" data-category="关注" onclick="selectCategory(this)">👥 关注</div>
+      <div class="category-tab" data-category="技术" onclick="selectCategory(this)">💻 技术</div>
+      <div class="category-tab" data-category="产品" onclick="selectCategory(this)">📱 产品</div>
+      <div class="category-tab" data-category="生活" onclick="selectCategory(this)">🌿 生活</div>
+      <div class="category-tab" data-category="游戏" onclick="selectCategory(this)">🎮 游戏</div>
+      <div class="category-tab" data-category="读书" onclick="selectCategory(this)">📚 读书</div>
+      <div class="category-tab" data-category="综合" onclick="selectCategory(this)">💬 综合</div>
+    </div>
+    <div class="sort-tabs">
+      <button class="sort-tab active" data-sort="new" onclick="selectSort(this)">最新</button>
+      <button class="sort-tab" data-sort="hot" onclick="selectSort(this)">最热</button>
+      <button class="sort-tab" data-sort="views" onclick="selectSort(this)">最多浏览</button>
+      <button class="sort-tab" data-sort="featured" onclick="selectSort(this)">💎 精华</button>
+    </div>
+    <div id="postList">
+      <div class="loading"><div class="spinner"></div>加载中...</div>
+    </div>
+    <div id="infiniteScrollSentinel" class="infinite-scroll-sentinel"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-title">🟢 在线用户</div>
+      <div id="onlineUsers">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:24px;font-weight:700;color:var(--success);" id="onlineCount">-</span>
+          <span style="font-size:13px;color:var(--text-secondary);">人在线</span>
+        </div>
+        <div id="onlineUsersList" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+      </div>
+    </div>
+    <div class="sidebar-card">
+      <div class="sidebar-title">📊 社区统计</div>
+      <div class="stat-grid">
+        <div class="stat-item"><div class="stat-number" id="statUsers">-</div><div class="stat-label">用户</div></div>
+        <div class="stat-item"><div class="stat-number" id="statPosts">-</div><div class="stat-label">帖子</div></div>
+        <div class="stat-item"><div class="stat-number" id="statComments">-</div><div class="stat-label">评论</div></div>
+        <div class="stat-item"><div class="stat-number" id="statViews">-</div><div class="stat-label">浏览</div></div>
+      </div>
+    </div>
+    <div class="sidebar-card">
+      <div class="sidebar-title">🔥 热门帖子</div>
+      <div id="hotPosts">加载中...</div>
+    </div>
+    <div class="sidebar-card">
+      <div class="sidebar-title">📈 热门话题</div>
+      <div id="trendingTopics">加载中...</div>
+    </div>
+    <div class="sidebar-card">
+      <div class="sidebar-title">🏷️ 热门标签</div>
+      <div class="tag-cloud" id="tagCloud">加载中...</div>
+    </div>
+    <div class="sidebar-card">
+      <div class="sidebar-title">💡 关于社区</div>
+      <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;">王业社区是一个开放的分享平台，支持 Markdown 格式，你可以在这里发布想法、分享经验、与他人交流讨论。</p>
+      <button class="btn btn-primary" style="width:100%;margin-top:14px;" onclick="showNewPostModal()">✏️ 发布帖子</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">欢迎来到王业社区</div><button class="modal-close" onclick="closeModal('authModal')">×</button></div>
+    <div class="modal-body">
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchAuthTab('login')">登录</button>
+        <button class="auth-tab" onclick="switchAuthTab('register')">注册</button>
+      </div>
+      <div class="auth-form active" id="loginForm">
+        <div class="form-group"><label class="form-label">用户名</label><input class="form-input" type="text" id="loginUsername" placeholder="请输入用户名"></div>
+        <div class="form-group"><label class="form-label">密码</label><input class="form-input" type="password" id="loginPassword" placeholder="请输入密码" onkeyup="if(event.key==='Enter')doLogin()"></div>
+        <div class="error-msg" id="loginError"></div>
+        <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="doLogin()">登录</button>
+        <p style="text-align:center;margin-top:14px;font-size:13px;"><a href="#" onclick="showResetPassword();return false;" style="color:var(--primary);">忘记密码？</a></p>
+        <p style="text-align:center;margin-top:8px;font-size:13px;color:var(--text-secondary);">测试账号：小明 / 123456</p>
+      </div>
+      <div class="auth-form" id="registerForm">
+        <div class="form-group"><label class="form-label">用户名</label><input class="form-input" type="text" id="regUsername" placeholder="2-20个字符"></div>
+        <div class="form-group"><label class="form-label">密码</label><input class="form-input" type="password" id="regPassword" placeholder="至少6个字符" onkeyup="if(event.key==='Enter')doRegister()"></div>
+        <div class="form-group"><label class="form-label">安全问题（忘记密码时使用）</label>
+          <select class="form-select" id="regSecQuestion">
+            <option value="">不设置</option>
+            <option value="你的第一只宠物叫什么名字？">你的第一只宠物叫什么名字？</option>
+            <option value="你的出生城市是？">你的出生城市是？</option>
+            <option value="你的小学校名是？">你的小学校名是？</option>
+            <option value="你最喜欢的食物是？">你最喜欢的食物是？</option>
+          </select>
+        </div>
+        <div class="form-group" id="regSecAnswerGroup" style="display:none;"><label class="form-label">安全问题答案</label><input class="form-input" type="text" id="regSecAnswer" placeholder="请输入答案"></div>
+        <div class="error-msg" id="regError"></div>
+        <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="doRegister()">注册</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="resetPasswordModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><div class="modal-title">重置密码</div><button class="modal-close" onclick="closeModal('resetPasswordModal')">×</button></div>
+    <div class="modal-body">
+      <div id="resetStep1">
+        <div class="form-group"><label class="form-label">用户名</label><input class="form-input" type="text" id="resetUsername" placeholder="请输入用户名"></div>
+        <div class="error-msg" id="resetError1"></div>
+        <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="resetStep1()">下一步</button>
+      </div>
+      <div id="resetStep2" style="display:none;">
+        <div class="form-group"><label class="form-label">安全问题</label><p id="resetQuestion" style="font-size:14px;color:var(--text);margin-top:4px;"></p></div>
+        <div class="form-group"><label class="form-label">答案</label><input class="form-input" type="text" id="resetAnswer" placeholder="请输入答案"></div>
+        <div class="form-group"><label class="form-label">新密码</label><input class="form-input" type="password" id="resetNewPassword" placeholder="至少6个字符"></div>
+        <div class="error-msg" id="resetError2"></div>
+        <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="resetStep2()">重置密码</button>
+      </div>
+      <div id="resetStep3" style="display:none;text-align:center;padding:20px 0;">
+        <div style="font-size:36px;margin-bottom:12px;">✅</div>
+        <p>密码重置成功！请使用新密码登录。</p>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="closeModal('resetPasswordModal')">返回登录</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Post Modal -->
+<div class="modal-overlay" id="newPostModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="postModalTitle">发布新帖子</div><button class="modal-close" onclick="closeModal('newPostModal')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">标题</label><input class="form-input" type="text" id="postTitle" placeholder="请输入标题" maxlength="100"></div>
+      <div class="form-group"><label class="form-label">分类</label>
+        <select class="form-select" id="postCategory">
+          <option value="综合">💬 综合</option>
+          <option value="技术">💻 技术</option>
+          <option value="产品">📱 产品</option>
+          <option value="生活">🌿 生活</option>
+          <option value="游戏">🎮 游戏</option>
+          <option value="读书">📚 读书</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">标签</label>
+        <div class="tag-input-wrapper" id="tagInputWrapper" onclick="document.getElementById('tagInput').focus()">
+          <input class="tag-input-field" id="tagInput" placeholder="输入标签后按回车" onkeydown="handleTagInput(event)">
+        </div>
+        <div class="md-hint">按回车添加标签，最多5个</div>
+      </div>
+      <div class="form-group"><label class="form-label">内容</label>
+        <div class="editor-wrapper">
+          <div class="editor-toolbar">
+            <button class="toolbar-btn" title="粗体" onclick="insertFormat('**','**')"><b>B</b></button>
+            <button class="toolbar-btn" title="斜体" onclick="insertFormat('*','*')"><i>I</i></button>
+            <button class="toolbar-btn" title="代码" onclick="insertFormat('`','`')">{ }</button>
+            <button class="toolbar-btn" title="代码块" onclick="insertFormat('\n```\n','\n```\n')">✣</button>
+            <button class="toolbar-btn" title="链接" onclick="insertFormat('[','](url)')">🔗</button>
+            <button class="toolbar-btn" title="列表" onclick="insertFormat('\n- ','')">☰</button>
+            <button class="toolbar-btn" title="引用" onclick="insertFormat('\n> ','')">❝</button>
+            <button class="toolbar-btn" title="标题" onclick="insertFormat('\n## ','')">H</button>
+            <button class="toolbar-btn" title="分割线" onclick="insertFormat('\n---\n','')">―</button>
+            <button class="toolbar-btn" title="图片" onclick="document.getElementById('imageUpload').click()">🖼️</button>
+            <input type="file" id="imageUpload" accept="image/*" style="display:none;" onchange="uploadImage(this)">
+          </div>
+          <textarea class="form-textarea" id="postContent" placeholder="分享你的想法...支持 Markdown 格式" rows="8"></textarea>
+        </div>
+        <div class="md-hint">支持 Markdown：**粗体** *斜体* `代码` - 列表 > 引用</div>
+      </div>
+      <div class="error-msg" id="postError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('newPostModal')">取消</button>
+      <button class="btn btn-primary" id="postSubmitBtn" onclick="submitPost()">发布</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Edit Modal -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">编辑个人资料</div><button class="modal-close" onclick="closeModal('profileModal')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">选择头像</label><div class="avatar-grid" id="avatarGrid"></div></div>
+      <div class="form-group"><label class="form-label">个人简介</label><textarea class="form-textarea" id="editBio" placeholder="介绍一下自己..." rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('profileModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveProfile()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header"><div class="modal-title" id="confirmTitle">确认操作</div><button class="modal-close" onclick="closeModal('confirmModal')">×</button></div>
+    <div class="modal-body"><p class="confirm-text" id="confirmText"></p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('confirmModal')">取消</button>
+      <button class="btn btn-danger" id="confirmBtn">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Change Modal -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header"><div class="modal-title">修改密码</div><button class="modal-close" onclick="closeModal('passwordModal')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">原密码</label><input class="form-input" type="password" id="oldPassword" placeholder="请输入原密码"></div>
+      <div class="form-group"><label class="form-label">新密码</label><input class="form-input" type="password" id="newPassword" placeholder="至少6个字符"></div>
+      <div class="form-group"><label class="form-label">确认新密码</label><input class="form-input" type="password" id="confirmPassword" placeholder="再次输入新密码"></div>
+      <div class="error-msg" id="passwordError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('passwordModal')">取消</button>
+      <button class="btn btn-primary" onclick="changePassword()">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image Lightbox -->
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('show')">
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- Keyboard Shortcuts Help -->
+<div class="shortcuts-help" id="shortcutsHelp">
+  <h4>⌨️ 快捷键</h4>
+  <div class="shortcut-row"><span>上下切换帖子</span><span><span class="shortcut-key">J</span> / <span class="shortcut-key">K</span></span></div>
+  <div class="shortcut-row"><span>点赞</span><span><span class="shortcut-key">L</span></span></div>
+  <div class="shortcut-row"><span>收藏</span><span><span class="shortcut-key">B</span></span></div>
+  <div class="shortcut-row"><span>打开帖子</span><span><span class="shortcut-key">Enter</span></span></div>
+  <div class="shortcut-row"><span>返回列表</span><span><span class="shortcut-key">Esc</span></span></div>
+  <div class="shortcut-row"><span>发帖</span><span><span class="shortcut-key">N</span></span></div>
+  <div class="shortcut-row"><span>搜索</span><span><span class="shortcut-key">/</span></span></div>
+  <div class="shortcut-row"><span>显示/隐藏快捷键</span><span><span class="shortcut-key">?</span></span></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
